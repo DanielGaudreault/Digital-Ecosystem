@@ -2,42 +2,47 @@ import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
 import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x90caf9); // soft sky
+scene.background = new THREE.Color(0x90caf9);
 
+// CAMERA
 const camera = new THREE.PerspectiveCamera(
   60,
   window.innerWidth / window.innerHeight,
   0.1,
   1000
 );
-camera.position.set(0, 25, 40);
+camera.position.set(30, 25, 40);
+camera.lookAt(0, 0, 0);
 
+// RENDERER
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
 
+// CONTROLS
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
 // LIGHTS
-const ambient = new THREE.AmbientLight(0xffffff, 0.7);
-scene.add(ambient);
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
 
-const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-sun.position.set(30, 50, 20);
+const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+sun.position.set(50, 80, 40);
 sun.castShadow = true;
-sun.shadow.mapSize.set(1024, 1024);
 scene.add(sun);
 
-// GROUND (low-poly plane)
-const groundGeo = new THREE.PlaneGeometry(120, 120, 25, 25);
+// DEBUG GRID (so you ALWAYS see something)
+const grid = new THREE.GridHelper(200, 40, 0x444444, 0x888888);
+scene.add(grid);
+
+// GROUND
+const groundGeo = new THREE.PlaneGeometry(200, 200, 30, 30);
 groundGeo.rotateX(-Math.PI / 2);
 
 const pos = groundGeo.attributes.position;
 for (let i = 0; i < pos.count; i++) {
-  const y = pos.getY(i);
-  pos.setY(i, y + (Math.random() - 0.5) * 2.0);
+  pos.setY(i, (Math.random() - 0.5) * 2.5);
 }
 pos.needsUpdate = true;
 groundGeo.computeVertexNormals();
@@ -46,118 +51,102 @@ const groundMat = new THREE.MeshLambertMaterial({
   color: 0x8bc34a,
   flatShading: true,
 });
+
 const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.receiveShadow = true;
 scene.add(ground);
 
 // LAKE
-const lakeGeo = new THREE.CircleGeometry(15, 32);
+const lakeGeo = new THREE.CircleGeometry(18, 32);
 lakeGeo.rotateX(-Math.PI / 2);
+
 const lakeMat = new THREE.MeshLambertMaterial({
   color: 0x4fc3f7,
   flatShading: true,
 });
+
 const lake = new THREE.Mesh(lakeGeo, lakeMat);
-lake.position.set(-15, 0.05, 5);
-lake.receiveShadow = false;
+lake.position.set(-20, 0.1, 10);
 scene.add(lake);
 
 // TREES
 function createTree(x, z) {
-  const trunkGeo = new THREE.CylinderGeometry(0.3, 0.3, 3, 6);
-  const trunkMat = new THREE.MeshLambertMaterial({
-    color: 0x8d6e63,
-    flatShading: true,
-  });
-  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.4, 0.4, 3, 6),
+    new THREE.MeshLambertMaterial({ color: 0x8d6e63, flatShading: true })
+  );
   trunk.position.set(x, 1.5, z);
   trunk.castShadow = true;
-  trunk.receiveShadow = true;
 
-  const crownGeo = new THREE.ConeGeometry(2.2, 4.5, 6);
-  const crownMat = new THREE.MeshLambertMaterial({
-    color: 0x4caf50,
-    flatShading: true,
-  });
-  const crown = new THREE.Mesh(crownGeo, crownMat);
-  crown.position.set(0, 3.5, 0);
+  const crown = new THREE.Mesh(
+    new THREE.ConeGeometry(2.5, 5, 6),
+    new THREE.MeshLambertMaterial({ color: 0x4caf50, flatShading: true })
+  );
+  crown.position.set(x, 4, z);
   crown.castShadow = true;
 
-  const tree = new THREE.Group();
-  tree.add(trunk);
-  tree.add(crown);
-  scene.add(tree);
+  scene.add(trunk, crown);
 }
 
-for (let i = 0; i < 35; i++) {
-  const x = (Math.random() - 0.5) * 100;
-  const z = (Math.random() - 0.5) * 100;
-  // keep most trees away from the lake center
-  if (Math.hypot(x + 15, z - 5) < 18) continue;
+for (let i = 0; i < 40; i++) {
+  const x = (Math.random() - 0.5) * 150;
+  const z = (Math.random() - 0.5) * 150;
+  if (Math.hypot(x + 20, z - 10) < 25) continue;
   createTree(x, z);
 }
 
-// CREATURE (low-poly fox/wolf)
+// CREATURE
 function createCreature(color = 0xd97a4a) {
   const group = new THREE.Group();
 
-  const bodyMat = new THREE.MeshLambertMaterial({
-    color,
-    flatShading: true,
-  });
+  const mat = new THREE.MeshLambertMaterial({ color, flatShading: true });
 
-  const bodyGeo = new THREE.BoxGeometry(3.5, 1.2, 1.2);
-  const body = new THREE.Mesh(bodyGeo, bodyMat);
-  body.castShadow = true;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.2, 1.2), mat);
   body.position.set(0, 1.2, 0);
+  body.castShadow = true;
   group.add(body);
 
-  const headGeo = new THREE.BoxGeometry(1.4, 1.0, 1.0);
-  const head = new THREE.Mesh(headGeo, bodyMat);
-  head.castShadow = true;
+  const head = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1, 1), mat);
   head.position.set(2.2, 1.5, 0);
+  head.castShadow = true;
   group.add(head);
 
   const earGeo = new THREE.ConeGeometry(0.25, 0.6, 4);
-  const ear1 = new THREE.Mesh(earGeo, bodyMat);
+  const ear1 = new THREE.Mesh(earGeo, mat);
   const ear2 = ear1.clone();
-  ear1.position.set(2.5, 2.0, 0.3);
-  ear2.position.set(2.5, 2.0, -0.3);
-  ear1.rotation.z = Math.PI;
-  ear2.rotation.z = Math.PI;
-  ear1.castShadow = ear2.castShadow = true;
+  ear1.position.set(2.5, 2, 0.3);
+  ear2.position.set(2.5, 2, -0.3);
+  ear1.rotation.z = ear2.rotation.z = Math.PI;
   group.add(ear1, ear2);
 
   const legGeo = new THREE.BoxGeometry(0.3, 0.9, 0.3);
-  const legOffsets = [
+  const legs = [
     [-1.2, 0.45, 0.4],
     [-1.2, 0.45, -0.4],
-    [1.0, 0.45, 0.4],
-    [1.0, 0.45, -0.4],
+    [1, 0.45, 0.4],
+    [1, 0.45, -0.4],
   ];
-  legOffsets.forEach(([x, y, z]) => {
-    const leg = new THREE.Mesh(legGeo, bodyMat);
+  legs.forEach(([x, y, z]) => {
+    const leg = new THREE.Mesh(legGeo, mat);
     leg.position.set(x, y, z);
     leg.castShadow = true;
     group.add(leg);
   });
 
-  const tailGeo = new THREE.ConeGeometry(0.4, 1.6, 5);
-  const tail = new THREE.Mesh(tailGeo, bodyMat);
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.6, 5), mat);
   tail.position.set(-2.1, 1.3, 0);
   tail.rotation.z = Math.PI / 3;
-  tail.castShadow = true;
   group.add(tail);
 
   group.position.set(
-    (Math.random() - 0.5) * 60,
+    (Math.random() - 0.5) * 40,
     0,
-    (Math.random() - 0.5) * 60
+    (Math.random() - 0.5) * 40
   );
+
   group.userData = {
     dir: new THREE.Vector2(Math.random() - 0.5, Math.random() - 0.5).normalize(),
-    speed: 0.05 + Math.random() * 0.05,
-    wiggleOffset: Math.random() * Math.PI * 2,
+    speed: 0.03 + Math.random() * 0.04,
   };
 
   scene.add(group);
@@ -165,34 +154,23 @@ function createCreature(color = 0xd97a4a) {
 }
 
 const creatures = [];
-for (let i = 0; i < 18; i++) {
-  const colors = [0xd97a4a, 0xc46a3a, 0xa85f3a, 0xb0bec5];
-  const color = colors[Math.floor(Math.random() * colors.length)];
-  creatures.push(createCreature(color));
+for (let i = 0; i < 20; i++) {
+  creatures.push(createCreature());
 }
 
-// SIMPLE WANDER + LITTLE BODY BOB
-function updateCreatures(time) {
+// MOVEMENT
+function updateCreatures() {
   creatures.forEach((c) => {
-    const data = c.userData;
+    const d = c.userData;
 
     if (Math.random() < 0.01) {
-      const angleChange = (Math.random() - 0.5) * 0.6;
-      data.dir.rotateAround(new THREE.Vector2(0, 0), angleChange);
+      d.dir.rotateAround(new THREE.Vector2(0, 0), (Math.random() - 0.5) * 0.6);
     }
 
-    c.position.x += data.dir.x * data.speed * 60 * 0.016;
-    c.position.z += data.dir.y * data.speed * 60 * 0.016;
+    c.position.x += d.dir.x * d.speed * 60 * 0.016;
+    c.position.z += d.dir.y * d.speed * 60 * 0.016;
 
-    const angle = Math.atan2(data.dir.x, data.dir.y);
-    c.rotation.y = angle;
-
-    const limit = 55;
-    if (c.position.x > limit || c.position.x < -limit) data.dir.x *= -1;
-    if (c.position.z > limit || c.position.z < -limit) data.dir.y *= -1;
-
-    const bob = Math.sin(time * 2 + data.wiggleOffset) * 0.05;
-    c.position.y = bob;
+    c.rotation.y = Math.atan2(d.dir.x, d.dir.y);
   });
 }
 
@@ -204,11 +182,10 @@ window.addEventListener("resize", () => {
 });
 
 // LOOP
-function animate(t) {
-  const time = t * 0.001;
+function animate() {
   requestAnimationFrame(animate);
   controls.update();
-  updateCreatures(time);
+  updateCreatures();
   renderer.render(scene, camera);
 }
 animate();
