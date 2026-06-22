@@ -21,7 +21,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
 // LIGHTS
-const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+const ambient = new THREE.AmbientLight(0xffffff, 0.7);
 scene.add(ambient);
 
 const sun = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -30,15 +30,14 @@ sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
 scene.add(sun);
 
-// GROUND (low-poly-ish plane)
-const groundGeo = new THREE.PlaneGeometry(100, 100, 20, 20);
+// GROUND (low-poly plane)
+const groundGeo = new THREE.PlaneGeometry(120, 120, 25, 25);
 groundGeo.rotateX(-Math.PI / 2);
 
-// jitter vertices a bit for low-poly terrain feel
 const pos = groundGeo.attributes.position;
 for (let i = 0; i < pos.count; i++) {
   const y = pos.getY(i);
-  pos.setY(i, y + (Math.random() - 0.5) * 1.5);
+  pos.setY(i, y + (Math.random() - 0.5) * 2.0);
 }
 pos.needsUpdate = true;
 groundGeo.computeVertexNormals();
@@ -51,7 +50,19 @@ const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.receiveShadow = true;
 scene.add(ground);
 
-// SIMPLE LOW-POLY TREE
+// LAKE
+const lakeGeo = new THREE.CircleGeometry(15, 32);
+lakeGeo.rotateX(-Math.PI / 2);
+const lakeMat = new THREE.MeshLambertMaterial({
+  color: 0x4fc3f7,
+  flatShading: true,
+});
+const lake = new THREE.Mesh(lakeGeo, lakeMat);
+lake.position.set(-15, 0.05, 5);
+lake.receiveShadow = false;
+scene.add(lake);
+
+// TREES
 function createTree(x, z) {
   const trunkGeo = new THREE.CylinderGeometry(0.3, 0.3, 3, 6);
   const trunkMat = new THREE.MeshLambertMaterial({
@@ -63,7 +74,7 @@ function createTree(x, z) {
   trunk.castShadow = true;
   trunk.receiveShadow = true;
 
-  const crownGeo = new THREE.ConeGeometry(2, 4, 6);
+  const crownGeo = new THREE.ConeGeometry(2.2, 4.5, 6);
   const crownMat = new THREE.MeshLambertMaterial({
     color: 0x4caf50,
     flatShading: true,
@@ -78,22 +89,24 @@ function createTree(x, z) {
   scene.add(tree);
 }
 
-for (let i = 0; i < 25; i++) {
-  createTree(
-    (Math.random() - 0.5) * 80,
-    (Math.random() - 0.5) * 80
-  );
+for (let i = 0; i < 35; i++) {
+  const x = (Math.random() - 0.5) * 100;
+  const z = (Math.random() - 0.5) * 100;
+  // keep most trees away from the lake center
+  if (Math.hypot(x + 15, z - 5) < 18) continue;
+  createTree(x, z);
 }
 
-// LOW-POLY CREATURE (fox/wolf-ish)
+// CREATURE (low-poly fox/wolf)
 function createCreature(color = 0xd97a4a) {
   const group = new THREE.Group();
 
-  const bodyGeo = new THREE.BoxGeometry(3.5, 1.2, 1.2);
   const bodyMat = new THREE.MeshLambertMaterial({
     color,
     flatShading: true,
   });
+
+  const bodyGeo = new THREE.BoxGeometry(3.5, 1.2, 1.2);
   const body = new THREE.Mesh(bodyGeo, bodyMat);
   body.castShadow = true;
   body.position.set(0, 1.2, 0);
@@ -144,6 +157,7 @@ function createCreature(color = 0xd97a4a) {
   group.userData = {
     dir: new THREE.Vector2(Math.random() - 0.5, Math.random() - 0.5).normalize(),
     speed: 0.05 + Math.random() * 0.05,
+    wiggleOffset: Math.random() * Math.PI * 2,
   };
 
   scene.add(group);
@@ -151,16 +165,20 @@ function createCreature(color = 0xd97a4a) {
 }
 
 const creatures = [];
-for (let i = 0; i < 15; i++) {
-  creatures.push(createCreature());
+for (let i = 0; i < 18; i++) {
+  const colors = [0xd97a4a, 0xc46a3a, 0xa85f3a, 0xb0bec5];
+  const color = colors[Math.floor(Math.random() * colors.length)];
+  creatures.push(createCreature(color));
 }
 
-// SIMPLE “WANDER” BEHAVIOR
-function updateCreatures() {
+// SIMPLE WANDER + LITTLE BODY BOB
+function updateCreatures(time) {
   creatures.forEach((c) => {
     const data = c.userData;
+
     if (Math.random() < 0.01) {
-      data.dir.rotateAround(new THREE.Vector2(0, 0), (Math.random() - 0.5) * 0.6);
+      const angleChange = (Math.random() - 0.5) * 0.6;
+      data.dir.rotateAround(new THREE.Vector2(0, 0), angleChange);
     }
 
     c.position.x += data.dir.x * data.speed * 60 * 0.016;
@@ -169,9 +187,12 @@ function updateCreatures() {
     const angle = Math.atan2(data.dir.x, data.dir.y);
     c.rotation.y = angle;
 
-    const limit = 45;
+    const limit = 55;
     if (c.position.x > limit || c.position.x < -limit) data.dir.x *= -1;
     if (c.position.z > limit || c.position.z < -limit) data.dir.y *= -1;
+
+    const bob = Math.sin(time * 2 + data.wiggleOffset) * 0.05;
+    c.position.y = bob;
   });
 }
 
@@ -183,11 +204,11 @@ window.addEventListener("resize", () => {
 });
 
 // LOOP
-function animate() {
+function animate(t) {
+  const time = t * 0.001;
   requestAnimationFrame(animate);
   controls.update();
-  updateCreatures();
+  updateCreatures(time);
   renderer.render(scene, camera);
 }
 animate();
-
