@@ -1,9 +1,9 @@
 body {
   margin: 0;
-  background: #111;
   overflow: hidden;
+  background: #87ceeb; /* sky-ish */
+  font-family: system-ui, sans-serif;
 }
 canvas {
   display: block;
 }
-
